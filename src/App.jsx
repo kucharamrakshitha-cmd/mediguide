@@ -62,49 +62,20 @@ const QUIZ_QUESTIONS = [
 
 const CONDITIONS = ["Diabetes","High Blood Pressure","Heart Disease","Asthma","Liver Disease","Kidney Disease","Stomach Ulcers","Thyroid Issues"];
 
-
-const GEMINI_API_KEY = "AIzaSyC1wi6PDNp8N0ifc6U9dCYB_bCoPFjjCgg";
-
 async function callClaude(messages, opts = {}) {
-  // Convert message format for Gemini
-  const contents = messages.map(m => {
-    if (typeof m.content === "string") {
-      return {
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }]
-      };
-    }
-    // Handle image messages
-    const parts = m.content.map(c => {
-      if (c.type === "image") {
-        return { inline_data: { mime_type: c.source.media_type, data: c.source.data } };
-      }
-      return { text: c.text };
-    });
-    return { role: "user", parts };
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: opts.max_tokens || 1200,
+      system: opts.system,
+      messages
+    })
   });
-
-  const body = {
-    contents,
-    generationConfig: { maxOutputTokens: opts.max_tokens || 1200, temperature: 0.7 }
-  };
-  if (opts.system) {
-    body.systemInstruction = { parts: [{ text: opts.system }] };
-  }
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    }
-  );
-
   const data = await response.json();
-  if (data.error) throw new Error(data.error.message);
-  if (!data.candidates || !data.candidates[0]) throw new Error("No response from Gemini");
-  return data.candidates[0].content.parts.map(p => p.text || "").join("\n");
+  if (!data.content) throw new Error("No content");
+  return data.content.filter(b => b.type === "text").map(b => b.text).join("\n");
 }
 
 async function aiGenerateMedicineCard(name) {
